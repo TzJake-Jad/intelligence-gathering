@@ -1,0 +1,410 @@
+[
+  {
+    "id": "arceuus1",
+    "area": "Arceuus",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1650,
+      "y": 3726
+    },
+    "boardMessage": "We've received reports of a gang meeting in Arceuus, in a house south east of the bank.",
+    "navHint": "The house exactly south-east of the bank, east of the walkway when walking into Arceuus. Ground floor."
+  },
+  {
+    "id": "arceuus2",
+    "area": "Arceuus",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1699,
+      "y": 3720
+    },
+    "boardMessage": "We've received reports of a gang meeting in Arceuus, in the temple crypt.",
+    "navHint": "Inside of the temple on the ground floor marked by green on the map."
+  },
+  {
+    "id": "arceuus3",
+    "area": "Arceuus",
+    "multi": true,
+    "plane": 1,
+    "worldPoint": {
+      "x": 1688,
+      "y": 3768
+    },
+    "boardMessage": "We've received reports of a gang meeting in Arceuus, upstairs in a house south west of the temple.",
+    "navHint": "Middle floor of house with teleport tablet lectern."
+  },
+  {
+    "id": "arceuus4",
+    "area": "Arceuus",
+    "multi": true,
+    "plane": 1,
+    "worldPoint": {
+      "x": 1688,
+      "y": 3721
+    },
+    "boardMessage": "We've received reports of a gang meeting in Arceuus, upstairs in the pub.",
+    "navHint": "The bar in the south-eastern portion of Arceuus, on the middle floor."
+  },
+  {
+    "id": "arceuus5",
+    "area": "Arceuus",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1720,
+      "y": 3765
+    },
+    "boardMessage": "We've received reports of a gang meeting in Arceuus, in a house south east of the temple.",
+    "navHint": "A house south-east of the temple."
+  },
+  {
+    "id": "arceuus6",
+    "area": "Arceuus",
+    "multi": true,
+    "plane": 1,
+    "worldPoint": {
+      "x": 1720,
+      "y": 3722
+    },
+    "boardMessage": "We've received reports of a gang meeting in Arceuus, upstairs in the general store.",
+    "navHint": "The general store is in the south-east part of Arceuus."
+  },
+  {
+    "id": "arceuus7",
+    "area": "Arceuus",
+    "multi": false,
+    "plane": 1,
+    "worldPoint": {
+      "x": 1629,
+      "y": 3745
+    },
+    "boardMessage": "We've received reports of a gang meeting in Arceuus, upstairs in the bank.",
+    "navHint": "The bank is in the south-west part of Arceuus."
+  },
+  {
+    "id": "hosidius1",
+    "area": "Hosidius",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1760,
+      "y": 3594
+    },
+    "boardMessage": "We've received reports of a gang meeting in the Hosidius Marketplace.",
+    "navHint": "The Hosidius Marketplace is east of the city's bank."
+  },
+  {
+    "id": "hosidius2",
+    "area": "Hosidius",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1649,
+      "y": 3609
+    },
+    "boardMessage": "We've received reports of a gang meeting south of Kourend Castle, in the vegetable field by the Mess.",
+    "navHint": "The field just south of the mess."
+  },
+  {
+    "id": "hosidius3",
+    "area": "Hosidius",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1743,
+      "y": 3616
+    },
+    "boardMessage": "We've received reports of a gang meeting in Hosidius, inside the pub.",
+    "navHint": "The Golden Field pub in the market square."
+  },
+  {
+    "id": "hosidius4",
+    "area": "Hosidius",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1776,
+      "y": 3506
+    },
+    "boardMessage": "We've received reports of a gang meeting west of the Tithe Farm.",
+    "navHint": "The ruins west of the Tithe Farm entrance."
+  },
+  {
+    "id": "hosidius5",
+    "area": "Hosidius",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1654,
+      "y": 3550
+    },
+    "boardMessage": "We've received reports of a gang meeting north of the Woodcutting Guild, by the minecart entrance.",
+    "navHint": "Directly north of the Hosidius mine cart track found north-east of the Woodcutting Guild."
+  },
+  {
+    "id": "hosidius6",
+    "area": "Hosidius",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1756,
+      "y": 3708
+    },
+    "boardMessage": "We've received reports of a gang meeting south of Port Piscarilius, by the minecart entrance.",
+    "navHint": "On the border of Port Piscarilius and Hosidius, next to Raeli. Slightly west of the minecart."
+  },
+  {
+    "id": "hosidius7",
+    "area": "Hosidius",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1752,
+      "y": 3350
+    },
+    "boardMessage": "We've received reports of a gang meeting south of Hosidius, in the cabbage patch.",
+    "navHint": "Just north of the POH portal."
+  },
+  {
+    "id": "hosidius8",
+    "area": "Hosidius",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1756,
+      "y": 3640
+    },
+    "boardMessage": "We've received reports of a gang meeting in Hosidius, in the cow field.",
+    "navHint": "Large cow field, south of the flax field."
+  },
+  {
+    "id": "hosidius9",
+    "area": "Hosidius",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1674,
+      "y": 3576
+    },
+    "boardMessage": "We've received reports of a gang meeting inside the Forthos Ruin.",
+    "navHint": "At the Forthos Ruin."
+  },
+  {
+    "id": "lovakengj1",
+    "area": "Lovakengj",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1565,
+      "y": 3759
+    },
+    "boardMessage": "We've received reports of a gang meeting in Lovakengj, in the pub.",
+    "navHint": "The Deeper Lode pub located south-east"
+  },
+  {
+    "id": "lovakengj2",
+    "area": "Lovakengj",
+    "multi": true,
+    "plane": 1,
+    "worldPoint": {
+      "x": 1556,
+      "y": 3785
+    },
+    "boardMessage": "We've received reports of a gang meeting in Lovakengj, upstairs in a house south east of the church.",
+    "navHint": "Climb up the stairs in any of the three buildings south-east of the church."
+  },
+  {
+    "id": "lovakengj3",
+    "area": "Lovakengj",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1517,
+      "y": 3833
+    },
+    "boardMessage": "We've received reports of a gang meeting in Lovakengj, in a house south east of the Blast Mine.",
+    "navHint": "Downstairs in the house just south-east of the Blast Mine, adjacent to a house with an anvil inside."
+  },
+  {
+    "id": "lovakengj4",
+    "area": "Lovakengj",
+    "multi": true,
+    "plane": 1,
+    "worldPoint": {
+      "x": 1510,
+      "y": 3770
+    },
+    "boardMessage": "We've received reports of a gang meeting in Lovakengj, upstairs in the building north east of the Lovakengj Assembly.",
+    "navHint": "Upstairs in the T-shaped building with the furnace north-east of the Lovakengj Assembly."
+  },
+  {
+    "id": "piscarilius1",
+    "area": "Piscarilius",
+    "multi": false,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1840,
+      "y": 3745
+    },
+    "boardMessage": "We've received reports of a gang meeting in Port Piscarilius, inside the foodhall.",
+    "navHint": "Far east in Piscarilius, in the largest building."
+  },
+  {
+    "id": "piscarilius2",
+    "area": "Piscarilius",
+    "multi": false,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1850,
+      "y": 3735
+    },
+    "boardMessage": "We've received reports of a gang meeting in Port Piscarilius, just behind the foodhall.",
+    "navHint": "Far east in Piscarilius, outside of the largest building."
+  },
+  {
+    "id": "piscarilius3",
+    "area": "Piscarilius",
+    "multi": true,
+    "plane": 1,
+    "worldPoint": {
+      "x": 1794,
+      "y": 3722
+    },
+    "boardMessage": "We've received reports of a gang meeting in Port Piscarilius, upstairs in a house west of the general store.",
+    "navHint": "Upstairs in the house west of the general store."
+  },
+  {
+    "id": "piscarilius4",
+    "area": "Piscarilius",
+    "multi": false,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1752,
+      "y": 3761
+    },
+    "boardMessage": "We've received reports of a gang meeting in Port Piscarilius, in a house on the western pier.",
+    "navHint": "In the western building over the water in the cove."
+  },
+  {
+    "id": "piscarilius5",
+    "area": "Piscarilius",
+    "multi": true,
+    "plane": 1,
+    "worldPoint": {
+      "x": 1805,
+      "y": 3737
+    },
+    "boardMessage": "We've received reports of a gang meeting in Port Piscarilius, upstairs in a house north of the general store.",
+    "navHint": "The middle floor of the house directly south of the bank, upstairs, water and stove icon."
+  },
+  {
+    "id": "piscarilius6",
+    "area": "Piscarilius",
+    "multi": false,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1749,
+      "y": 3732
+    },
+    "boardMessage": "We've received reports of a gang meeting in Port Piscarilius, in a house on the south west pier.",
+    "navHint": "The south-west corner, on the docks, not the main land."
+  },
+  {
+    "id": "shayzien1",
+    "area": "Shayzien",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1428,
+      "y": 3648
+    },
+    "boardMessage": "We've received reports of a gang meeting in the forest south of the Chasm of Fire.",
+    "navHint": "South of entrance to the Chasm of Fire."
+  },
+  {
+    "id": "shayzien2",
+    "area": "Shayzien",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1484,
+      "y": 3555
+    },
+    "boardMessage": "We've received reports of a gang infiltrating our own city! They're meeting in the south west corner of the graveyard.",
+    "navHint": "South-west corner of the Graveyard of Heroes."
+  },
+  {
+    "id": "shayzien3",
+    "area": "Shayzien",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1436,
+      "y": 3595
+    },
+    "boardMessage": "We've received reports of a gang meeting in a ruin south of the Giant Pit.",
+    "navHint": "South of the Giant Pit."
+  },
+  {
+    "id": "shayzien4",
+    "area": "Shayzien",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1586,
+      "y": 3595
+    },
+    "boardMessage": "We've received reports of a gang meeting in the Shayzia Ruin, north east of our city.",
+    "navHint": "In the Shayzia Ruin."
+  },
+  {
+    "id": "other1",
+    "area": "Other",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1649,
+      "y": 3680
+    },
+    "boardMessage": "We've received reports of a gang meeting at the statue of King Rada outside Kourend Castle.",
+    "navHint": "East of the statue in Kourend Castle."
+  },
+  {
+    "id": "other2",
+    "area": "Other",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1581,
+      "y": 3435
+    },
+    "boardMessage": "We've received reports of a gang meeting in the Kourend Woodland barbarian camp.",
+    "navHint": "The barbarian camp south the Woodcutting Guild."
+  },
+  {
+    "id": "other3",
+    "area": "Other",
+    "multi": true,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1617,
+      "y": 3687
+    },
+    "boardMessage": "We've received reports of a gang meeting inside Kourend Castle, in one of the lesser used north eastern rooms.",
+    "navHint": "The Kourend Castle in one of the north-eastern rooms."
+  },
+  {
+    "id": "other4",
+    "area": "Other",
+    "multi": false,
+    "plane": 0,
+    "worldPoint": {
+      "x": 1503,
+      "y": 3432
+    },
+    "boardMessage": "We've received reports of a gang meeting in a house in Land's End.",
+    "navHint": "The house north of the bank in Land's End."
+  }
+]

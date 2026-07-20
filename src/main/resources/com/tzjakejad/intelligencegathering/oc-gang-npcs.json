@@ -1,0 +1,7 @@
+{
+  "_comment": "Captured in-game (spec §3/§4). Boss with a known combat style: maleBossIds = throwing knives (dangerous), femaleBossIds = cutlass/melee (safe). Boss seen but style not yet confirmed: bossIds (still highlighted, but its per-world dot stays grey/unknown). gangsterIds = the surrounding mob. Distinguish by id, not name.",
+  "maleBossIds": [6902],
+  "femaleBossIds": [6900],
+  "bossIds": [],
+  "gangsterIds": [6896, 6897, 6898, 6899]
+}
