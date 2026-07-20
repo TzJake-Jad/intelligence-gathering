@@ -18,7 +18,7 @@ dependencies {
 	compileOnly 'org.projectlombok:lombok:1.18.34'
 	annotationProcessor 'org.projectlombok:lombok:1.18.34'
 
-	testImplementation 'junit:junit:4.12'
+	testImplementation 'junit:junit:4.13.2'
 	testImplementation group: 'net.runelite', name: 'client', version: runeLiteVersion
 	testImplementation group: 'net.runelite', name: 'jshell', version: runeLiteVersion
 }
@@ -26,13 +26,20 @@ dependencies {
 group = 'com.tzjakejad.intelligencegathering'
 version = '1.0-SNAPSHOT'
 
-tasks.withType(JavaCompile) {
+tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'
 	options.release.set(11)
 }
 
-task(run, dependsOn: jar, type: JavaExec) {
+test {
+	// The test source set only holds the RuneLite dev launcher, not JUnit tests; Gradle 9
+	// otherwise fails the build when test sources discover no tests.
+	failOnNoDiscoveredTests = false
+}
+
+tasks.register('run', JavaExec) {
 	group = 'application'
+	dependsOn tasks.jar
 	classpath = sourceSets.test.runtimeClasspath
 	mainClass = 'com.tzjakejad.intelligencegathering.IntelligenceGatheringPluginTest'
 	enableAssertions = true

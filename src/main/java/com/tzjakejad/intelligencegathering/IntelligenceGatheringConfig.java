@@ -225,8 +225,8 @@ public interface IntelligenceGatheringConfig extends Config
 
 	@ConfigItem(
 		keyName = "bossHighlightStyle",
-		name = "Boss highlight style",
-		description = "How to render the boss highlight",
+		name = "Highlight style",
+		description = "How to render the gangster and boss highlights",
 		section = combatSection,
 		position = 2
 	)

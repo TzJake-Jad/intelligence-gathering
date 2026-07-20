@@ -22,7 +22,6 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +43,7 @@ import net.runelite.api.events.ItemSpawned;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.NpcSpawned;
 import net.runelite.api.events.WidgetLoaded;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.callback.ClientThread;
@@ -52,6 +52,7 @@ import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.PluginMessage;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SkillIconManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -68,14 +69,6 @@ import net.runelite.client.util.ImageUtil;
 )
 public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceGatheringController
 {
-	// Confirmed against the original plugin's WidgetConstants (Mordo95/shayzien-organised-crime):
-	// info board = 291, "no info" interface = 229. In the original the location text sat in
-	// children 5-15 of group 291 and the time line starts with "The meeting is expected to".
-	// TODO(spec §3.3/§6): swap these literals for the matching net.runelite.api.gameval.InterfaceID
-	// constants (cosmetic; the numbers themselves are correct).
-	private static final int NOTICE_BOARD_GROUP_ID = 291;
-	private static final int NO_INFO_GROUP_ID = 229;
-
 	@Inject
 	private Client client;
 
@@ -127,6 +120,9 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 	@Inject
 	private SkillIconManager skillIconManager;
 
+	@Inject
+	private ItemManager itemManager;
+
 	@Getter
 	private volatile CurrentMeeting currentMeeting;
 
@@ -143,7 +139,12 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 	/** Last target posted to Shortest Path, for the §2 debounce. */
 	private WorldPoint lastRouted;
 
+	/** World seen on the previous game tick; the panel is only rebuilt when it changes. */
+	private int lastWorld = -1;
+
 	private BufferedImage markerIcon;
+	/** Intelligence item sprite for the despawn infobox; null until fetched on the client thread. */
+	private volatile BufferedImage intelIcon;
 	private BufferedImage worldMapIcon;
 	private IntelligenceGatheringPanel panel;
 	private NavigationButton navButton;
@@ -175,7 +176,11 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 
 		// Restore on the client thread: it touches client state (hint arrow, Shortest Path) and
 		// startUp runs on the Swing thread when the plugin is toggled from the config panel.
-		clientThread.invokeLater(this::restoreState);
+		clientThread.invokeLater(() ->
+		{
+			intelIcon = itemManager.getImage(ItemID.SHAYZIEN_GANG_INTELLIGENCE);
+			restoreState();
+		});
 
 		log.info("Intelligence Gathering started");
 	}
@@ -197,13 +202,10 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 		}
 
 		OcLocation location = restored.getMeeting().getLocation();
-		if (config.showWorldMapMarker())
-		{
-			worldMapController.set(location, worldMapIcon);
-		}
+		applyWorldMapMarker();
 		updateHintArrow();
 		routeTo(location.getWorldPoint());
-		meetingTimers.update(currentMeeting, config, this, markerIcon, markerIcon);
+		meetingTimers.update(currentMeeting, config, this, markerIcon, despawnIcon());
 		refreshPanel();
 		log.debug("Restored organised crime meeting: {}", location.getId());
 	}
@@ -226,6 +228,8 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 		gangsters.clear();
 		bosses.clear();
 		intelTiles.clear();
+		lastWorld = -1;
+		intelIcon = null;
 		panel = null;
 		navButton = null;
 		log.info("Intelligence Gathering stopped");
@@ -253,6 +257,8 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
+		worldHopper.processPendingHop();
+
 		CurrentMeeting meeting = currentMeeting;
 
 		// Drop the meeting once its window has fully rotated out.
@@ -268,29 +274,58 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 			recordCurrentWorld();
 		}
 
-		meetingTimers.update(meeting, config, this, markerIcon, markerIcon);
-		refreshPanel();
+		meetingTimers.update(meeting, config, this, markerIcon, despawnIcon());
+
+		// The panel's own 1s ticker keeps the countdowns fresh; a full rebuild is only needed when
+		// the world changes (hop list "here" marker and Hop button enablement follow the world).
+		int world = client.getWorld();
+		if (world != lastWorld)
+		{
+			lastWorld = world;
+			refreshPanel();
+		}
 	}
 
 	@Subscribe
 	public void onWidgetLoaded(WidgetLoaded event)
 	{
-		if (event.getGroupId() == NO_INFO_GROUP_ID)
+		if (event.getGroupId() == InterfaceID.MESSAGEBOX)
 		{
-			clearMeeting();
+			// Read on the client thread once the widget has populated.
+			clientThread.invokeLater(this::readMessageBox);
 			return;
 		}
 
-		if (event.getGroupId() == NOTICE_BOARD_GROUP_ID)
+		if (event.getGroupId() == InterfaceID.NOTE)
 		{
-			// Read on the client thread once the widget has populated.
-			clientThread.invokeLater(() -> readBoard(NOTICE_BOARD_GROUP_ID));
+			clientThread.invokeLater(this::readBoard);
 		}
 	}
 
-	private void readBoard(int groupId)
+	/**
+	 * MESSAGEBOX is the generic text dialog used all over the game, so it only means "no meeting"
+	 * when it actually carries the notice board's no-intelligence message — an unrelated message
+	 * box must not wipe the tracked meeting. Failing closed is cheap: a missed clear self-corrects
+	 * on the next board read or when the rotation window lapses.
+	 */
+	private void readMessageBox()
 	{
-		List<String> lines = collectBoardText(groupId);
+		if (currentMeeting == null)
+		{
+			return;
+		}
+
+		String text = String.join(" ", collectBoardText(InterfaceID.MESSAGEBOX)).toLowerCase();
+		if (text.contains("intelligence") || text.contains("gang") || text.contains("noticeboard")
+			|| text.contains("notice board"))
+		{
+			clearMeeting();
+		}
+	}
+
+	private void readBoard()
+	{
+		List<String> lines = collectBoardText(InterfaceID.NOTE);
 		NoticeBoardReader.BoardReadResult result = boardReader.read(lines);
 		if (result == null)
 		{
@@ -300,6 +335,15 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 		if (config.logRotations())
 		{
 			rotationLogger.log(result.getLocation().getId());
+		}
+
+		// An untracked location still gets its rotation row logged above (the CSV records what was
+		// observed, not what was followed) — it just isn't shown or navigated to.
+		if (!isTracked(result.getLocation()))
+		{
+			log.debug("Ignoring meeting at {} (filtered by tracking config)", result.getLocation().getId());
+			clearMeeting();
+			return;
 		}
 
 		long now = System.currentTimeMillis();
@@ -333,18 +377,10 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 		currentMeeting = meeting;
 		worldStatuses.computeIfAbsent(client.getWorld(), WorldStatus::new);
 
-		if (config.showWorldMapMarker())
-		{
-			worldMapController.set(location, worldMapIcon);
-		}
-		else
-		{
-			worldMapController.clear();
-		}
-
+		applyWorldMapMarker();
 		updateHintArrow();
 		routeTo(location.getWorldPoint());
-		meetingTimers.update(meeting, config, this, markerIcon, markerIcon);
+		meetingTimers.update(meeting, config, this, markerIcon, despawnIcon());
 		persist();
 		refreshPanel();
 		log.debug("Current organised crime meeting: {} ({})", location.getId(), location.getArea());
@@ -387,6 +423,51 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 		{
 			panel.refresh();
 		}
+	}
+
+	/** Whether the tracking filters (area toggles + multicombat-only) include this location. */
+	private boolean isTracked(OcLocation location)
+	{
+		if (config.multiCombatOnly() && !location.isMulti())
+		{
+			return false;
+		}
+		switch (location.getArea())
+		{
+			case "Arceuus":
+				return config.trackArceuus();
+			case "Hosidius":
+				return config.trackHosidius();
+			case "Lovakengj":
+				return config.trackLovakengj();
+			case "Piscarilius":
+				return config.trackPiscarilius();
+			case "Shayzien":
+				return config.trackShayzien();
+			default:
+				return config.trackOther();
+		}
+	}
+
+	/** Reconcile the world-map marker with the current meeting and config. */
+	private void applyWorldMapMarker()
+	{
+		CurrentMeeting meeting = currentMeeting;
+		if (config.showWorldMapMarker() && meeting != null)
+		{
+			worldMapController.set(meeting.getLocation(), worldMapIcon);
+		}
+		else
+		{
+			worldMapController.clear();
+		}
+	}
+
+	/** Despawn infobox icon: the intelligence item sprite once fetched, else the plugin badge. */
+	private BufferedImage despawnIcon()
+	{
+		BufferedImage icon = intelIcon;
+		return icon != null ? icon : markerIcon;
 	}
 
 	private void updateHintArrow()
@@ -443,23 +524,57 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (!IntelligenceGatheringConfig.GROUP.equals(event.getGroup())
-			|| !"routeViaShortestPath".equals(event.getKey()))
+		if (!IntelligenceGatheringConfig.GROUP.equals(event.getGroup()))
 		{
 			return;
 		}
 
-		if (config.routeViaShortestPath())
+		switch (event.getKey())
 		{
-			CurrentMeeting meeting = currentMeeting;
-			if (meeting != null)
+			case "routeViaShortestPath":
+				if (config.routeViaShortestPath())
+				{
+					CurrentMeeting meeting = currentMeeting;
+					if (meeting != null)
+					{
+						routeTo(meeting.getLocation().getWorldPoint());
+					}
+				}
+				else
+				{
+					clearRoute();
+				}
+				break;
+			case "showHintArrow":
+				// Config changes arrive on the Swing thread; the hint arrow is client state.
+				clientThread.invokeLater(this::updateHintArrow);
+				break;
+			case "showWorldMapMarker":
+				applyWorldMapMarker();
+				break;
+			case "safeWorldsOnly":
+				refreshPanel();
+				break;
+			case "multiCombatOnly":
+			case "trackArceuus":
+			case "trackHosidius":
+			case "trackLovakengj":
+			case "trackPiscarilius":
+			case "trackShayzien":
+			case "trackOther":
 			{
-				routeTo(meeting.getLocation().getWorldPoint());
+				// Tightening a filter drops a now-excluded meeting. Loosening one can't bring a
+				// dropped meeting back (its state is gone) — the next board read picks it up.
+				CurrentMeeting tracked = currentMeeting;
+				if (tracked != null && !isTracked(tracked.getLocation()))
+				{
+					// clearMeeting touches the hint arrow, which is client state.
+					clientThread.invokeLater(this::clearMeeting);
+				}
+				break;
 			}
-		}
-		else
-		{
-			clearRoute();
+			default:
+				break;
 		}
 	}
 
@@ -490,8 +605,23 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 	public void onNpcDespawned(NpcDespawned event)
 	{
 		NPC npc = event.getNpc();
-		bosses.remove(npc);
+		// A tracked boss despawning dead means this world's meeting was cleared. The bosses set is
+		// emptied on hop/scene teardown before their despawns arrive, so remove() returning true
+		// distinguishes a live-scene despawn from teardown; isDead filters walking-away despawns.
+		if (bosses.remove(npc) && npc.isDead() && currentMeeting != null)
+		{
+			markWorldCleared();
+		}
 		gangsters.remove(npc);
+	}
+
+	/** Mark the player's current world cleared for this cycle (the panel's "done" tag). */
+	private void markWorldCleared()
+	{
+		WorldStatus status = worldStatuses.computeIfAbsent(client.getWorld(), WorldStatus::new);
+		status.setLastClearedMs(System.currentTimeMillis());
+		persist();
+		refreshPanel();
 	}
 
 	@Subscribe

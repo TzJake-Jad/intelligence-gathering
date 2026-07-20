@@ -26,10 +26,9 @@ import lombok.extern.slf4j.Slf4j;
 @Singleton
 public class NoticeBoardReader
 {
-	// "... in 12 minutes", "... in 1 minute". Also matches "now"/"imminently" separately.
+	// "... in 12 minutes", "... in 1 minute". A board with no countdown (meeting already up)
+	// simply yields no match, which callers treat as "starts now".
 	private static final Pattern MINUTES = Pattern.compile("(\\d+)\\s*minute", Pattern.CASE_INSENSITIVE);
-	private static final Pattern IMMINENT = Pattern.compile("\\b(now|imminent|imminently|any moment)\\b",
-		Pattern.CASE_INSENSITIVE);
 
 	private final OcLocations ocLocations;
 
@@ -95,7 +94,7 @@ public class NoticeBoardReader
 			return null;
 		}
 
-		return new BoardReadResult(match, exact, parseMinutes(joined), isImminent(joined));
+		return new BoardReadResult(match, exact, parseMinutes(joined));
 	}
 
 	/** Token-overlap fallback against the known messages. */
@@ -149,11 +148,6 @@ public class NoticeBoardReader
 		return null;
 	}
 
-	private static boolean isImminent(String normalisedText)
-	{
-		return IMMINENT.matcher(normalisedText).find();
-	}
-
 	/** Collapse whitespace, unify smart quotes/apostrophes, lowercase for comparison. */
 	static String normalise(String s)
 	{
@@ -183,8 +177,5 @@ public class NoticeBoardReader
 
 		/** Minutes until appearance, or null if not present on the board. */
 		Integer minutesUntil;
-
-		/** True when the board says the meeting is now/imminent. */
-		boolean imminent;
 	}
 }

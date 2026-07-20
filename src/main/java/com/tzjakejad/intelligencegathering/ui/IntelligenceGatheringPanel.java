@@ -14,7 +14,9 @@ import java.awt.Insets;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -52,6 +54,9 @@ public class IntelligenceGatheringPanel extends PluginPanel
 
 	private final IntelligenceGatheringController controller;
 	private final SkillIconManager skillIconManager;
+
+	/** Scaled location screenshots by location id; loading + SCALE_SMOOTH is too slow to redo per rebuild. */
+	private final Map<String, ImageIcon> locationImages = new HashMap<>();
 
 	private final JPanel cardPanel = new JPanel(new BorderLayout());
 	private final JPanel hopContainer = new JPanel();
@@ -91,7 +96,7 @@ public class IntelligenceGatheringPanel extends PluginPanel
 		body.add(Box.createRigidArea(new Dimension(0, 10)));
 		body.add(cardPanel);
 		body.add(Box.createRigidArea(new Dimension(0, 12)));
-		body.add(sectionHeader("Worlds this cycle"));
+		body.add(worldsSectionHeader());
 		body.add(Box.createRigidArea(new Dimension(0, 6)));
 		body.add(hopContainer);
 
@@ -182,8 +187,8 @@ public class IntelligenceGatheringPanel extends PluginPanel
 		CurrentMeeting meeting = controller.getCurrentMeeting();
 		if (meeting == null)
 		{
-			cardPanel.add(wrappedLabel("No meeting known — read a notice board.",
-				ColorScheme.LIGHT_GRAY_COLOR), BorderLayout.CENTER);
+			cardPanel.add(wrappedLabel("No meeting known — read a notice board."),
+				BorderLayout.CENTER);
 			return;
 		}
 
@@ -200,7 +205,7 @@ public class IntelligenceGatheringPanel extends PluginPanel
 		lines.add(area);
 		lines.add(Box.createRigidArea(new Dimension(0, 6)));
 
-		lines.add(wrappedLabel(loc.getNavHint(), ColorScheme.LIGHT_GRAY_COLOR));
+		lines.add(wrappedLabel(loc.getNavHint()));
 
 		// The plane is authoritative for the floor, so always surface an "Upstairs" cue for a raised
 		// spawn — a couple of hints only say "middle floor" (arceuus3/4), which doesn't read as "go
@@ -230,7 +235,7 @@ public class IntelligenceGatheringPanel extends PluginPanel
 		rotationValue = countdownValueLabel();
 		lines.add(countdownRow(primaryCaption, primaryValue));
 		lines.add(Box.createRigidArea(new Dimension(0, 4)));
-		lines.add(countdownRow("Rotates", rotationValue));
+		lines.add(countdownRow(new JLabel("Rotates"), rotationValue));
 		tick();
 
 		// Location screenshot (the map crop from the original plugin), same as it displayed it.
@@ -420,11 +425,6 @@ public class IntelligenceGatheringPanel extends PluginPanel
 		return value;
 	}
 
-	private static JPanel countdownRow(String caption, JLabel value)
-	{
-		return countdownRow(new JLabel(caption), value);
-	}
-
 	/** A "Label ............ value" row that stretches the full card width. */
 	private static JPanel countdownRow(JLabel caption, JLabel value)
 	{
@@ -488,10 +488,10 @@ public class IntelligenceGatheringPanel extends PluginPanel
 		return tag;
 	}
 
-	private JComponent sectionHeader(String text)
+	private JComponent worldsSectionHeader()
 	{
 		JPanel panel = leftPanel(new BorderLayout(0, 4));
-		JLabel label = new JLabel(text.toUpperCase());
+		JLabel label = new JLabel("WORLDS THIS CYCLE");
 		label.setFont(FontManager.getRunescapeSmallFont());
 		label.setForeground(ColorScheme.BRAND_ORANGE);
 		panel.add(label, BorderLayout.NORTH);
@@ -509,13 +509,27 @@ public class IntelligenceGatheringPanel extends PluginPanel
 		return line;
 	}
 
-	private static JLabel locationImage(OcLocation loc)
+	private JLabel locationImage(OcLocation loc)
+	{
+		ImageIcon icon = locationImages.computeIfAbsent(loc.getId(), IntelligenceGatheringPanel::loadLocationIcon);
+		if (icon == null)
+		{
+			return null;
+		}
+
+		JLabel label = new JLabel(icon);
+		label.setAlignmentX(Component.LEFT_ALIGNMENT);
+		label.setBorder(BorderFactory.createLineBorder(SEPARATOR));
+		return label;
+	}
+
+	private static ImageIcon loadLocationIcon(String locationId)
 	{
 		BufferedImage img;
 		try
 		{
 			img = ImageUtil.loadImageResource(IntelligenceGatheringPanel.class,
-				"/com/tzjakejad/intelligencegathering/ui/" + loc.getId() + ".png");
+				"/com/tzjakejad/intelligencegathering/ui/" + locationId + ".png");
 		}
 		catch (RuntimeException e)
 		{
@@ -528,19 +542,15 @@ public class IntelligenceGatheringPanel extends PluginPanel
 			return null;
 		}
 
-		Image scaled = img.getScaledInstance(IMAGE_SIZE, IMAGE_SIZE, Image.SCALE_SMOOTH);
-		JLabel label = new JLabel(new ImageIcon(scaled));
-		label.setAlignmentX(Component.LEFT_ALIGNMENT);
-		label.setBorder(BorderFactory.createLineBorder(SEPARATOR));
-		return label;
+		return new ImageIcon(img.getScaledInstance(IMAGE_SIZE, IMAGE_SIZE, Image.SCALE_SMOOTH));
 	}
 
-	private static JLabel wrappedLabel(String text, Color color)
+	private static JLabel wrappedLabel(String text)
 	{
 		// HTML lets the label wrap within the fixed panel width.
 		JLabel label = new JLabel("<html><body style='width:" + CONTENT_WIDTH + "px'>"
 			+ escape(text) + "</body></html>");
-		label.setForeground(color);
+		label.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		label.setFont(FontManager.getRunescapeSmallFont());
 		label.setAlignmentX(Component.LEFT_ALIGNMENT);
 		return label;

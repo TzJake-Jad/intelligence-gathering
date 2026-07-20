@@ -8,7 +8,8 @@ where it is, when it starts, and which worlds you've already checked.
 ## Features
 
 - **Side panel** showing the current meeting location with a picture of the spot, plus a
-  per-world status list so you can keep track while world hopping
+  per-world status list so you can keep track while world hopping — worlds are marked done
+  when their gang boss is killed
 - **Navigation help**: world map marker, tile highlight at the meeting spot, an optional hint
   arrow, and optional routing via the Shortest Path plugin
 - **Combat overlays**: highlights gangsters and the gang boss, with separate colours for
@@ -26,3 +27,9 @@ where it is, when it starts, and which worlds you've already checked.
 2. Read the notice board in the Shayzien Encampment
 3. Follow the world map marker / tile highlight to the meeting spot
 4. Hop worlds and repeat — the panel tracks the status of each world for you
+
+## Acknowledgements
+
+Heavily inspired by the organised crime plugins of **Dylan Lange** and
+**[Mordo95](https://github.com/Mordo95/shayzien-organised-crime)** — thank you both for your
+versions, which this plugin builds on.
