@@ -14,6 +14,7 @@ import com.tzjakejad.intelligencegathering.model.WorldStatus;
 import com.tzjakejad.intelligencegathering.hop.WorldHopper;
 import com.tzjakejad.intelligencegathering.nav.SceneOverlay;
 import com.tzjakejad.intelligencegathering.nav.WorldMapController;
+import com.tzjakejad.intelligencegathering.rewards.XpRewardLock;
 import com.tzjakejad.intelligencegathering.timer.MeetingTimers;
 import com.tzjakejad.intelligencegathering.ui.IntelligenceGatheringController;
 import com.tzjakejad.intelligencegathering.ui.IntelligenceGatheringPanel;
@@ -40,6 +41,7 @@ import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemDespawned;
 import net.runelite.api.events.ItemSpawned;
+import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.NpcSpawned;
 import net.runelite.api.events.WidgetLoaded;
@@ -122,6 +124,9 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 
 	@Inject
 	private ItemManager itemManager;
+
+	@Inject
+	private XpRewardLock xpRewardLock;
 
 	@Getter
 	private volatile CurrentMeeting currentMeeting;
@@ -258,6 +263,7 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 	public void onGameTick(GameTick event)
 	{
 		worldHopper.processPendingHop();
+		xpRewardLock.markLockedOptions();
 
 		CurrentMeeting meeting = currentMeeting;
 
@@ -284,6 +290,12 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 			lastWorld = world;
 			refreshPanel();
 		}
+	}
+
+	@Subscribe
+	public void onMenuOptionClicked(MenuOptionClicked event)
+	{
+		xpRewardLock.onMenuOptionClicked(event);
 	}
 
 	@Subscribe

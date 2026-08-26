@@ -1,6 +1,8 @@
 package com.tzjakejad.intelligencegathering;
 
 import java.awt.Color;
+import java.util.EnumSet;
+import java.util.Set;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -45,6 +47,13 @@ public interface IntelligenceGatheringConfig extends Config
 		position = 4
 	)
 	String dataSection = "data";
+
+	@ConfigSection(
+		name = "Rewards",
+		description = "Guards on the reward XP dialog",
+		position = 5
+	)
+	String rewardsSection = "rewards";
 
 	// ------------------------------------------------------------------ Tracking
 
@@ -360,10 +369,56 @@ public interface IntelligenceGatheringConfig extends Config
 		return false;
 	}
 
+	// ------------------------------------------------------------------- Rewards
+
+	@ConfigItem(
+		keyName = "lockXpReward",
+		name = "Lock reward XP skills",
+		description = "Ignore clicks on skills you have not allowed in the \"What kind of training will you pursue?\" dialog",
+		section = rewardsSection,
+		position = 0
+	)
+	default boolean lockXpReward()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "allowedXpSkills",
+		name = "Allowed skills",
+		description = "Skills that stay clickable. Ctrl-click to pick more than one; selecting none blocks every skill",
+		section = rewardsSection,
+		position = 1
+	)
+	default Set<RewardSkill> allowedXpSkills()
+	{
+		return EnumSet.of(RewardSkill.DEFENCE);
+	}
+
 	enum BossHighlightStyle
 	{
 		HULL,
 		TILE,
 		OUTLINE
+	}
+
+	/**
+	 * The four skills the reward dialog offers, in the order it lists them. Deliberately not the
+	 * full skill list: the chest only ever trains combat, and a longer list would just be noise to
+	 * scroll past. Constant names must match the skill named in the dialog row, which is how
+	 * {@code XpRewardLock} pairs an option with its entry here.
+	 */
+	enum RewardSkill
+	{
+		ATTACK,
+		STRENGTH,
+		DEFENCE,
+		HITPOINTS;
+
+		@Override
+		public String toString()
+		{
+			return name().charAt(0) + name().substring(1).toLowerCase(java.util.Locale.ROOT);
+		}
 	}
 }
