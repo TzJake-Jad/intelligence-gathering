@@ -32,7 +32,7 @@
       "x": 1688,
       "y": 3768
     },
-    "boardMessage": "We've received reports of a gang meeting in Arceuus, upstairs in a house south west of the temple.",
+    "boardMessage": "We've received reports of a gang meeting in Arceuus, upstairs in a house south-west of the temple.",
     "navHint": "Middle floor of house with teleport tablet lectern."
   },
   {
@@ -74,7 +74,7 @@
   {
     "id": "arceuus7",
     "area": "Arceuus",
-    "multi": false,
+    "multi": true,
     "plane": 1,
     "worldPoint": {
       "x": 1629,
@@ -392,13 +392,13 @@
       "x": 1617,
       "y": 3687
     },
-    "boardMessage": "We've received reports of a gang meeting inside Kourend Castle, in one of the lesser used north eastern rooms.",
+    "boardMessage": "We've received reports of a gang meeting inside Kourend Castle, in one of the lesser used north-eastern rooms.",
     "navHint": "The Kourend Castle in one of the north-eastern rooms."
   },
   {
     "id": "other4",
     "area": "Other",
-    "multi": false,
+    "multi": true,
     "plane": 0,
     "worldPoint": {
       "x": 1503,

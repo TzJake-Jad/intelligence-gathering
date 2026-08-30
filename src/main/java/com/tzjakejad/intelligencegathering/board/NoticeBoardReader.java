@@ -148,7 +148,14 @@ public class NoticeBoardReader
 		return null;
 	}
 
-	/** Collapse whitespace, unify smart quotes/apostrophes, lowercase for comparison. */
+	/**
+	 * Collapse whitespace, unify smart quotes/apostrophes and dashes, lowercase for comparison.
+	 *
+	 * <p>Dashes fold to spaces because the two sides disagree about them: the board writes
+	 * "south-west" and "north-eastern" where the seed file spelled them with spaces. Without
+	 * this the exact and substring passes both miss and the read falls through to the fuzzy
+	 * matcher, which is a coin toss between several near-identical messages in one area.
+	 */
 	static String normalise(String s)
 	{
 		if (s == null)
@@ -161,6 +168,9 @@ public class NoticeBoardReader
 			.replace('“', '"')    // left double quote
 			.replace('”', '"')    // right double quote
 			.replace(' ', ' ')    // non-breaking space
+			.replace('-', ' ')     // hyphen
+			.replace('–', ' ')     // en dash
+			.replace('—', ' ')     // em dash
 			.replaceAll("\\s+", " ")
 			.trim()
 			.toLowerCase();

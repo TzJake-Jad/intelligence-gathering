@@ -19,7 +19,10 @@ public class OcLocation
 	/** Arceuus / Hosidius / Lovakengj / Piscarilius / Shayzien / Other. */
 	private String area;
 
-	/** Multicombat flag. Only arceuus7 and other4 are single-way. */
+	/**
+	 * Multicombat flag, per the wiki's Meeting locations table. Only the four Port Piscarilius
+	 * spots (foodhall, behind the foodhall, western pier, south-west pier) are single-way.
+	 */
 	private boolean multi;
 
 	/** Floor: 0 ground, 1 upstairs/middle. Inferred from the description; verify in-game. */
