@@ -11,9 +11,15 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Image;
 import java.awt.Insets;
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.StringSelection;
+import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +76,13 @@ public class IntelligenceGatheringPanel extends PluginPanel
 	private JLabel primaryValue;
 	private JLabel rotationValue;
 
+	/** Share row: "Copy" is only meaningful with a meeting to copy, and the note reports both outcomes. */
+	private final JButton copyButton = new JButton("Copy code");
+	private final JLabel shareNote = new JLabel();
+
+	/** Clears {@link #shareNote} a few seconds after it is set, so feedback doesn't linger stale. */
+	private final Timer noteTimer = new Timer(4000, e -> setNoteText(" "));
+
 	public IntelligenceGatheringPanel(IntelligenceGatheringController controller, SkillIconManager skillIconManager)
 	{
 		super(false);
@@ -99,6 +112,8 @@ public class IntelligenceGatheringPanel extends PluginPanel
 		body.add(worldsSectionHeader());
 		body.add(Box.createRigidArea(new Dimension(0, 6)));
 		body.add(hopContainer);
+		body.add(Box.createRigidArea(new Dimension(0, 12)));
+		body.add(buildShareRow());
 
 		add(body, BorderLayout.NORTH);
 
@@ -136,6 +151,7 @@ public class IntelligenceGatheringPanel extends PluginPanel
 	public void removeNotify()
 	{
 		ticker.stop();
+		noteTimer.stop();
 		super.removeNotify();
 	}
 
@@ -146,6 +162,7 @@ public class IntelligenceGatheringPanel extends PluginPanel
 		{
 			rebuildCard();
 			rebuildHopList();
+			copyButton.setEnabled(controller.getCurrentMeeting() != null);
 			revalidate();
 			repaint();
 		});
@@ -187,8 +204,15 @@ public class IntelligenceGatheringPanel extends PluginPanel
 		CurrentMeeting meeting = controller.getCurrentMeeting();
 		if (meeting == null)
 		{
-			cardPanel.add(wrappedLabel("No meeting known — read a notice board."),
-				BorderLayout.CENTER);
+			// A board read that the tracking filters discarded looks identical to one that never
+			// parsed, so say which it was rather than leaving the user to guess at a bug.
+			String notice = controller.getFilterNotice();
+			JLabel empty = wrappedLabel(notice != null ? notice : "No meeting known — read a notice board.");
+			if (notice != null)
+			{
+				empty.setForeground(WARN_AMBER);
+			}
+			cardPanel.add(empty, BorderLayout.CENTER);
 			return;
 		}
 
@@ -486,6 +510,122 @@ public class IntelligenceGatheringPanel extends PluginPanel
 		tag.setFont(FontManager.getRunescapeSmallFont());
 		tag.setForeground(color);
 		return tag;
+	}
+
+	/**
+	 * Share row: copy the cycle to the clipboard, or import a code someone pasted you. Both go via
+	 * the system clipboard rather than a text field — the code is long, and nobody types it by hand.
+	 */
+	private JComponent buildShareRow()
+	{
+		JPanel section = leftPanel(new BorderLayout(0, 4));
+
+		JLabel header = new JLabel("SHARE");
+		header.setFont(FontManager.getRunescapeSmallFont());
+		header.setForeground(ColorScheme.BRAND_ORANGE);
+
+		JPanel head = leftPanel(new BorderLayout(0, 4));
+		head.add(header, BorderLayout.NORTH);
+		head.add(separator(), BorderLayout.CENTER);
+
+		JPanel buttons = leftPanel(new BorderLayout(6, 0));
+		copyButton.setFont(FontManager.getRunescapeSmallFont());
+		copyButton.setFocusPainted(false);
+		copyButton.setMargin(new Insets(2, 6, 2, 6));
+		copyButton.setToolTipText("Copy this cycle's meeting and world list to the clipboard");
+		copyButton.addActionListener(e -> onCopy());
+
+		JButton importButton = new JButton("Import");
+		importButton.setFont(FontManager.getRunescapeSmallFont());
+		importButton.setFocusPainted(false);
+		importButton.setMargin(new Insets(2, 6, 2, 6));
+		importButton.setToolTipText("Import a code from the clipboard");
+		importButton.addActionListener(e -> onImport());
+
+		buttons.add(copyButton, BorderLayout.WEST);
+		buttons.add(importButton, BorderLayout.EAST);
+
+		// A space rather than an empty string, so the row keeps its height and the buttons above it
+		// do not jump when feedback appears and clears.
+		shareNote.setText(" ");
+		shareNote.setFont(FontManager.getRunescapeSmallFont());
+		shareNote.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+
+		JPanel below = leftPanel(new BorderLayout(0, 4));
+		below.add(buttons, BorderLayout.NORTH);
+		below.add(shareNote, BorderLayout.CENTER);
+
+		section.add(head, BorderLayout.NORTH);
+		section.add(below, BorderLayout.CENTER);
+		noteTimer.setRepeats(false);
+		return section;
+	}
+
+	private void onCopy()
+	{
+		String code = controller.exportShareCode();
+		if (code == null)
+		{
+			note("Nothing to share yet — read the notice board first.", DANGER_RED);
+			return;
+		}
+
+		try
+		{
+			Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(code), null);
+		}
+		catch (IllegalStateException e)
+		{
+			// Another application is holding the clipboard open; nothing to do but say so.
+			note("Clipboard is busy — try again.", DANGER_RED);
+			return;
+		}
+		note("Copied. Paste it to a friend.", OK_GREEN);
+	}
+
+	private void onImport()
+	{
+		String pasted;
+		try
+		{
+			Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+			if (!clipboard.isDataFlavorAvailable(DataFlavor.stringFlavor))
+			{
+				note("No text on the clipboard to import.", DANGER_RED);
+				return;
+			}
+			pasted = (String) clipboard.getData(DataFlavor.stringFlavor);
+		}
+		catch (IllegalStateException | UnsupportedFlavorException | IOException e)
+		{
+			note("Couldn't read the clipboard — try again.", DANGER_RED);
+			return;
+		}
+
+		String error = controller.importShareCode(pasted);
+		if (error != null)
+		{
+			note(error, DANGER_RED);
+			return;
+		}
+		note("Imported.", OK_GREEN);
+	}
+
+	/** Show a short-lived line under the share buttons. */
+	private void note(String text, Color color)
+	{
+		shareNote.setForeground(color);
+		// The sidebar is narrow, so let the longer rejection messages wrap instead of being clipped.
+		setNoteText("<html><body style='width:" + CONTENT_WIDTH + "px'>" + text + "</body></html>");
+		noteTimer.restart();
+	}
+
+	/** A wrapped note changes the row's height, so the panel has to lay out again around it. */
+	private void setNoteText(String text)
+	{
+		shareNote.setText(text);
+		revalidate();
+		repaint();
 	}
 
 	private JComponent worldsSectionHeader()

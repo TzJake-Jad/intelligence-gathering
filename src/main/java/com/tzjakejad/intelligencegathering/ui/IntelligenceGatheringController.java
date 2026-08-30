@@ -20,4 +20,23 @@ public interface IntelligenceGatheringController
 	boolean isSafeWorldsOnly();
 
 	void hop(int world);
+
+	/**
+	 * Why the panel is empty even though a notice board was read successfully, or null when there is
+	 * no such explanation. A meeting discarded by the tracking filters is otherwise indistinguishable
+	 * from one that never parsed.
+	 */
+	String getFilterNotice();
+
+	/** Share code for the current cycle, or null when there is no meeting to share. */
+	String exportShareCode();
+
+	/**
+	 * Apply a pasted share code.
+	 *
+	 * @return null once the import is under way, or a message to show the user if the code was
+	 *     rejected. Validation is synchronous so the panel can report the reason immediately; the
+	 *     state change itself is handed to the client thread.
+	 */
+	String importShareCode(String code);
 }

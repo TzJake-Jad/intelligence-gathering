@@ -7,6 +7,7 @@ import com.tzjakejad.intelligencegathering.combat.GroundItemOverlay;
 import com.tzjakejad.intelligencegathering.combat.NpcHighlightOverlay;
 import com.tzjakejad.intelligencegathering.data.MeetingStore;
 import com.tzjakejad.intelligencegathering.data.RotationLogger;
+import com.tzjakejad.intelligencegathering.data.ShareCode;
 import com.tzjakejad.intelligencegathering.model.BossGender;
 import com.tzjakejad.intelligencegathering.model.CurrentMeeting;
 import com.tzjakejad.intelligencegathering.model.OcLocation;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.regex.Pattern;
 import javax.inject.Inject;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -128,6 +130,9 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 	@Inject
 	private XpRewardLock xpRewardLock;
 
+	@Inject
+	private ShareCode shareCode;
+
 	@Getter
 	private volatile CurrentMeeting currentMeeting;
 
@@ -140,6 +145,27 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 
 	/** Tiles holding dropped gang intelligence (item 13395), for the ground highlight. */
 	private final Set<Tile> intelTiles = ConcurrentHashMap.newKeySet();
+
+	/**
+	 * Present in all 34 known board messages and specific enough that no other interface trips it.
+	 * Gates the full match so the board can be found without hardcoding which interface renders it.
+	 */
+	private static final Pattern BOARD_SENTINEL = Pattern.compile("received\\s+reports", Pattern.CASE_INSENSITIVE);
+
+	/**
+	 * A message box has to be saying there is nothing, not merely talking about gangs, before it
+	 * is allowed to clear a meeting. Word boundaries keep "no" from matching inside "north".
+	 */
+	private static final Pattern NO_MEETING = Pattern.compile(
+		"\\b(no|not|none|nothing|never|empty|quiet|aren't|isn't|haven't|hasn't|don't)\\b",
+		Pattern.CASE_INSENSITIVE);
+
+	/**
+	 * Last board read the tracking filters discarded, kept only so the panel can say why it is empty.
+	 * Held alongside the reason and expired with its own rotation window.
+	 */
+	private volatile CurrentMeeting excludedMeeting;
+	private volatile String excludedReason;
 
 	/** Last target posted to Shortest Path, for the §2 debounce. */
 	private WorldPoint lastRouted;
@@ -267,6 +293,14 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 
 		CurrentMeeting meeting = currentMeeting;
 
+		CurrentMeeting excluded = excludedMeeting;
+		if (excluded != null && excluded.rotationEndMs() <= System.currentTimeMillis())
+		{
+			excludedMeeting = null;
+			excludedReason = null;
+			refreshPanel();
+		}
+
 		// Drop the meeting once its window has fully rotated out.
 		if (meeting != null && meeting.rotationEndMs() <= System.currentTimeMillis())
 		{
@@ -301,16 +335,35 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 	@Subscribe
 	public void onWidgetLoaded(WidgetLoaded event)
 	{
-		if (event.getGroupId() == InterfaceID.MESSAGEBOX)
+		// Resolve the id now rather than inside the lambda, which runs a tick later.
+		int groupId = event.getGroupId();
+		// Read on the client thread once the widget has populated.
+		clientThread.invokeLater(() -> readInterface(groupId));
+	}
+
+	/**
+	 * Look for the notice board in a freshly loaded interface, whichever one it is.
+	 *
+	 * <p>Keying off a single interface id was too brittle: every known board message contains the
+	 * word "gang", which is also one of the sentinels {@link #readMessageBox} treats as "no meeting".
+	 * So if the board ever renders through MESSAGEBOX rather than NOTE, the old dispatch would both
+	 * fail to parse the location and clear the meeting it should have set. Matching on the text
+	 * instead removes the guess: {@link #BOARD_SENTINEL} appears in all 34 board messages and
+	 * nothing else, so an unrelated interface is discarded before the matcher ever sees it.
+	 */
+	private void readInterface(int groupId)
+	{
+		List<String> lines = collectBoardText(groupId);
+
+		if (readBoard(groupId, lines))
 		{
-			// Read on the client thread once the widget has populated.
-			clientThread.invokeLater(this::readMessageBox);
 			return;
 		}
 
-		if (event.getGroupId() == InterfaceID.NOTE)
+		// Only once the text is known not to be a board reading can a message box mean "no meeting".
+		if (groupId == InterfaceID.MESSAGEBOX)
 		{
-			clientThread.invokeLater(this::readBoard);
+			readMessageBox(lines);
 		}
 	}
 
@@ -319,29 +372,57 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 	 * when it actually carries the notice board's no-intelligence message — an unrelated message
 	 * box must not wipe the tracked meeting. Failing closed is cheap: a missed clear self-corrects
 	 * on the next board read or when the rotation window lapses.
+	 *
+	 * <p>Being on-topic is not enough on its own. The Shayzien Encampment is full of dialogue about
+	 * the gangs, and the board's own reading contains "gang" too, so a topic word alone would let an
+	 * ordinary conversation wipe a meeting that had just been read. A clear needs the message to
+	 * also be saying that there is <em>nothing</em>.
 	 */
-	private void readMessageBox()
+	private void readMessageBox(List<String> lines)
 	{
 		if (currentMeeting == null)
 		{
 			return;
 		}
 
-		String text = String.join(" ", collectBoardText(InterfaceID.MESSAGEBOX)).toLowerCase();
-		if (text.contains("intelligence") || text.contains("gang") || text.contains("noticeboard")
-			|| text.contains("notice board"))
+		String text = String.join(" ", lines).toLowerCase();
+		boolean topical = text.contains("intelligence") || text.contains("gang")
+			|| text.contains("noticeboard") || text.contains("notice board");
+		if (topical && NO_MEETING.matcher(text).find())
 		{
+			log.info("Message box reports no gang activity; clearing the meeting: {}", text);
 			clearMeeting();
 		}
 	}
 
-	private void readBoard()
+	/**
+	 * @return true when the text was a board reading, whether or not it resolved to a location —
+	 *     either way it is not a "no meeting" message box.
+	 */
+	private boolean readBoard(int groupId, List<String> lines)
 	{
-		List<String> lines = collectBoardText(InterfaceID.NOTE);
+		if (lines.isEmpty())
+		{
+			return false;
+		}
+
+		String joined = String.join(" ", lines);
+		if (!BOARD_SENTINEL.matcher(joined).find())
+		{
+			return false;
+		}
+
+		if (groupId != InterfaceID.NOTE)
+		{
+			// Worth knowing: the interface the board actually uses was inferred, not confirmed.
+			log.info("Notice board text found on interface {}, not the expected {}", groupId, InterfaceID.NOTE);
+		}
+
 		NoticeBoardReader.BoardReadResult result = boardReader.read(lines);
 		if (result == null)
 		{
-			return;
+			log.warn("Interface {} carries notice board text that matched no known location: {}", groupId, joined);
+			return true;
 		}
 
 		if (config.logRotations())
@@ -351,30 +432,44 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 
 		// An untracked location still gets its rotation row logged above (the CSV records what was
 		// observed, not what was followed) — it just isn't shown or navigated to.
-		if (!isTracked(result.getLocation()))
+		// This is the one gate between a row reaching rotations.csv and the panel updating, so it
+		// says so loudly rather than at debug: from the panel a filtered read is indistinguishable
+		// from a parse failure.
+		String exclusion = trackingExclusion(result.getLocation());
+		if (exclusion != null)
 		{
-			log.debug("Ignoring meeting at {} (filtered by tracking config)", result.getLocation().getId());
+			log.warn("Read a meeting at {} ({}) but the {} setting excludes it, so the panel stays empty",
+				result.getLocation().getId(), result.getLocation().getArea(), exclusion);
+			// clearMeeting() resets the panel, so record the reason after it and refresh again.
 			clearMeeting();
-			return;
+			excludedMeeting = new CurrentMeeting(result.getLocation(), scheduledMs(result), System.currentTimeMillis());
+			excludedReason = exclusion;
+			refreshPanel();
+			return true;
 		}
 
-		long now = System.currentTimeMillis();
-		long scheduled = now;
-		if (result.getMinutesUntil() != null)
-		{
-			scheduled = now + result.getMinutesUntil() * 60_000L;
-		}
-
-		setMeeting(new CurrentMeeting(result.getLocation(), scheduled, now));
+		setMeeting(new CurrentMeeting(result.getLocation(), scheduledMs(result), System.currentTimeMillis()));
 
 		if (!result.isExactMatch())
 		{
 			log.warn("Notice board matched only fuzzily to {}", result.getLocation().getId());
 		}
+		return true;
+	}
+
+	/** Board countdown resolved to an absolute time; absent means the meeting is already due. */
+	private static long scheduledMs(NoticeBoardReader.BoardReadResult result)
+	{
+		long now = System.currentTimeMillis();
+		return result.getMinutesUntil() == null ? now : now + result.getMinutesUntil() * 60_000L;
 	}
 
 	private void setMeeting(CurrentMeeting meeting)
 	{
+		// A meeting we are actually showing supersedes any note about a filtered one.
+		excludedMeeting = null;
+		excludedReason = null;
+
 		CurrentMeeting previous = currentMeeting;
 		OcLocation location = meeting.getLocation();
 
@@ -386,16 +481,25 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 			bosses.clear();
 		}
 
+		activateMeeting(meeting);
+		log.debug("Current organised crime meeting: {} ({})", location.getId(), location.getArea());
+	}
+
+	/**
+	 * Install a meeting as the live one and reconcile every derived display. Shared by the local
+	 * board read and by {@link #applyShared}.
+	 */
+	private void activateMeeting(CurrentMeeting meeting)
+	{
 		currentMeeting = meeting;
 		worldStatuses.computeIfAbsent(client.getWorld(), WorldStatus::new);
 
 		applyWorldMapMarker();
 		updateHintArrow();
-		routeTo(location.getWorldPoint());
+		routeTo(meeting.getLocation().getWorldPoint());
 		meetingTimers.update(meeting, config, this, markerIcon, despawnIcon());
 		persist();
 		refreshPanel();
-		log.debug("Current organised crime meeting: {} ({})", location.getId(), location.getArea());
 	}
 
 	private void clearMeeting()
@@ -440,24 +544,34 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 	/** Whether the tracking filters (area toggles + multicombat-only) include this location. */
 	private boolean isTracked(OcLocation location)
 	{
+		return trackingExclusion(location) == null;
+	}
+
+	/**
+	 * The name of the setting that excludes this location, or null when it passes. Returning the
+	 * reason rather than a bare boolean is what lets a discarded board read explain itself: the
+	 * filters are invisible from the panel, so a silent drop looks exactly like a failure to parse.
+	 */
+	private String trackingExclusion(OcLocation location)
+	{
 		if (config.multiCombatOnly() && !location.isMulti())
 		{
-			return false;
+			return "Multicombat only";
 		}
 		switch (location.getArea())
 		{
 			case "Arceuus":
-				return config.trackArceuus();
+				return config.trackArceuus() ? null : "Track Arceuus";
 			case "Hosidius":
-				return config.trackHosidius();
+				return config.trackHosidius() ? null : "Track Hosidius";
 			case "Lovakengj":
-				return config.trackLovakengj();
+				return config.trackLovakengj() ? null : "Track Lovakengj";
 			case "Piscarilius":
-				return config.trackPiscarilius();
+				return config.trackPiscarilius() ? null : "Track Piscarilius";
 			case "Shayzien":
-				return config.trackShayzien();
+				return config.trackShayzien() ? null : "Track Shayzien";
 			default:
-				return config.trackOther();
+				return config.trackOther() ? null : "Track Other";
 		}
 	}
 
@@ -713,6 +827,97 @@ public class IntelligenceGatheringPlugin extends Plugin implements IntelligenceG
 		{
 			collectText(child, out);
 		}
+	}
+
+	@Override
+	public String getFilterNotice()
+	{
+		CurrentMeeting excluded = excludedMeeting;
+		String reason = excludedReason;
+		if (excluded == null || reason == null || excluded.rotationEndMs() <= System.currentTimeMillis())
+		{
+			return null;
+		}
+		return "Read a meeting in " + excluded.getLocation().getArea()
+			+ ", but your \"" + reason + "\" setting is hiding it.";
+	}
+
+	// ------------------------------------------------------------------ Share codes
+
+	@Override
+	public String exportShareCode()
+	{
+		CurrentMeeting meeting = currentMeeting;
+		return meeting == null ? null : shareCode.encode(meeting, worldStatuses.values());
+	}
+
+	@Override
+	public String importShareCode(String code)
+	{
+		ShareCode.Decoded decoded;
+		try
+		{
+			decoded = shareCode.decode(code);
+		}
+		catch (ShareCode.InvalidCodeException e)
+		{
+			return e.getMessage();
+		}
+
+		OcLocation location = decoded.getMeeting().getLocation();
+		// The sender's tracking filters are not ours: a shared meeting in an area the user has
+		// switched off should say so rather than silently reinstating it.
+		if (!isTracked(location))
+		{
+			return "That meeting is in " + location.getArea() + ", which your tracking filters exclude.";
+		}
+
+		clientThread.invoke(() -> applyShared(decoded));
+		return null;
+	}
+
+	/**
+	 * Adopt an imported cycle. An import is an explicit request, so the code's meeting wins outright
+	 * rather than being arbitrated against ours — but its world list is merged, not substituted, so
+	 * importing never discards scouting the importer did first-hand.
+	 */
+	private void applyShared(ShareCode.Decoded decoded)
+	{
+		CurrentMeeting meeting = decoded.getMeeting();
+		CurrentMeeting previous = currentMeeting;
+
+		if (previous == null || !previous.getLocation().getId().equals(meeting.getLocation().getId()))
+		{
+			// A different location means a different cycle — everything we knew belongs to the old one.
+			worldStatuses.clear();
+			gangsters.clear();
+			bosses.clear();
+		}
+
+		for (WorldStatus incoming : decoded.getWorlds())
+		{
+			WorldStatus status = worldStatuses.get(incoming.getWorld());
+			if (status == null)
+			{
+				status = new WorldStatus(incoming.getWorld());
+				worldStatuses.put(incoming.getWorld(), status);
+			}
+
+			// A gender we watched spawn ourselves outranks a shared one; otherwise fill the blank.
+			if (status.getBossGender() == BossGender.UNKNOWN)
+			{
+				status.setBossGender(incoming.getBossGender());
+			}
+
+			// Meetings are not instanced, so someone else's clear consumed that world for us too.
+			if (incoming.getLastClearedMs() > status.getLastClearedMs())
+			{
+				status.setLastClearedMs(incoming.getLastClearedMs());
+			}
+		}
+
+		activateMeeting(meeting);
+		log.debug("Imported meeting {} with {} worlds", meeting.getLocation().getId(), decoded.getWorlds().size());
 	}
 
 	// ------------------------------------------------------ IntelligenceGatheringController
